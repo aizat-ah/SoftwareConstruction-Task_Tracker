@@ -1,37 +1,70 @@
 <template>
   <div id="app">
-    <nav class="custom-navbar">
-      <div class="nav-container">
-        <router-link to="/" class="nav-brand">Student Task Tracker</router-link>
-        <div class="nav-links">
-          <a
-            href="#"
-            :class="['nav-link', { active: currentView === 'dashboard' }]"
-            @click="currentView = 'dashboard'"
-          >
-            Dashboard
-          </a>
-          <a
-            href="#"
-            :class="['nav-link', { active: currentView === 'tasks' }]"
-            @click="currentView = 'tasks'"
-          >
-            Tasks
-          </a>
+    <!-- ── AUTH GATE ─────────────────────────────────────────────────────── -->
+    <transition name="fade" mode="out-in">
+      <LoginPage
+        v-if="!isAuthenticated && authView === 'login'"
+        key="login"
+        @login-success="handleAuthSuccess"
+        @switch-to-register="authView = 'register'"
+      />
+      <RegisterPage
+        v-else-if="!isAuthenticated && authView === 'register'"
+        key="register"
+        @register-success="handleAuthSuccess"
+        @switch-to-login="authView = 'login'"
+      />
+
+      <!-- ── MAIN APP ────────────────────────────────────────────────────── -->
+      <div v-else key="app" class="app-shell">
+        <nav class="custom-navbar">
+          <div class="nav-container">
+            <span class="nav-brand">Student Task Tracker</span>
+            <div class="nav-links">
+              <a
+                href="#"
+                :class="['nav-link', { active: currentView === 'dashboard' }]"
+                @click.prevent="currentView = 'dashboard'"
+              >
+                Dashboard
+              </a>
+              <a
+                href="#"
+                :class="['nav-link', { active: currentView === 'tasks' }]"
+                @click.prevent="currentView = 'tasks'"
+              >
+                Tasks
+              </a>
+            </div>
+
+            <!-- User info + Logout -->
+            <div class="nav-user">
+              <div class="user-avatar">{{ userInitial }}</div>
+              <span class="username-label">{{ currentUser.username }}</span>
+              <button class="logout-btn" @click="handleLogout" id="logout-btn" title="Sign out">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <polyline points="16 17 21 12 16 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <span>Sign out</span>
+              </button>
+            </div>
+          </div>
+        </nav>
+
+        <div class="main-container">
+          <component
+            :is="currentComponent"
+            :task="selectedTask"
+            @edit-task="handleEditTask"
+            @task-saved="handleTaskSaved"
+            @cancel="currentView = 'tasks'"
+            @add-task="handleAddTask"
+          />
         </div>
       </div>
-    </nav>
-
-    <div class="main-container">
-      <component
-        :is="currentComponent"
-        :task="selectedTask"
-        @edit-task="handleEditTask"
-        @task-saved="handleTaskSaved"
-        @cancel="currentView = 'tasks'"
-        @add-task="handleAddTask"
-      />
-    </div>
+    </transition>
   </div>
 </template>
 
@@ -39,6 +72,9 @@
 import TaskDashboard from "./components/Dashboard.vue";
 import TaskList from "./components/TaskList.vue";
 import TaskForm from "./components/TaskForm.vue";
+import LoginPage from "./components/LoginPage.vue";
+import RegisterPage from "./components/RegisterPage.vue";
+import { authService } from "./services/auth";
 
 export default {
   name: "App",
@@ -46,9 +82,17 @@ export default {
     TaskDashboard,
     TaskList,
     TaskForm,
+    LoginPage,
+    RegisterPage,
   },
   data() {
     return {
+      // Auth state
+      isAuthenticated: authService.isLoggedIn(),
+      authView: "login",           // 'login' | 'register'
+      currentUser: authService.getUser() || {},
+
+      // App state (existing)
       currentView: "dashboard",
       selectedTask: null,
     };
@@ -56,20 +100,34 @@ export default {
   computed: {
     currentComponent() {
       switch (this.currentView) {
-        case "dashboard":
-          return "TaskDashboard";
-        case "tasks":
-          return "TaskList";
-        case "add-task":
-          return "TaskForm";
-        case "edit-task":
-          return "TaskForm";
-        default:
-          return "TaskDashboard";
+        case "dashboard":  return "TaskDashboard";
+        case "tasks":      return "TaskList";
+        case "add-task":   return "TaskForm";
+        case "edit-task":  return "TaskForm";
+        default:           return "TaskDashboard";
       }
+    },
+    userInitial() {
+      const name = this.currentUser?.username || "";
+      return name.charAt(0).toUpperCase() || "U";
     },
   },
   methods: {
+    // Called after successful login or register
+    handleAuthSuccess(user) {
+      this.currentUser = user;
+      this.isAuthenticated = true;
+      this.currentView = "dashboard";
+    },
+
+    async handleLogout() {
+      await authService.logout();
+      this.isAuthenticated = false;
+      this.currentUser = {};
+      this.currentView = "dashboard";
+      this.authView = "login";
+    },
+
     handleEditTask(task) {
       this.selectedTask = task;
       this.currentView = "edit-task";
@@ -87,28 +145,36 @@ export default {
 </script>
 
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+* { box-sizing: border-box; }
+
 #app {
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #2c3e50;
+  min-height: 100vh;
+}
+
+.app-shell {
   background-color: #f8f9fa;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
+/* ─── Navbar ─────────────────────────────────────────────────────────────── */
 .custom-navbar {
   background: white;
   padding: 0.8rem 0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
   position: sticky;
   top: 0;
   z-index: 1000;
   height: 64px;
 }
-
 .nav-container {
   max-width: 1400px;
   margin: 0 auto;
@@ -118,28 +184,19 @@ export default {
   align-items: center;
   height: 100%;
 }
-
 .nav-brand {
   color: #2c3e50;
-  font-size: 1.5rem;
-  font-weight: 600;
-  text-decoration: none;
-  transition: color 0.2s ease;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   margin-right: auto;
 }
-
-.nav-brand:hover {
-  color: #3498db;
-  text-decoration: none;
-}
-
 .nav-links {
   display: flex;
   gap: 2rem;
-  margin-left: auto;
+  margin: 0 2rem;
   align-items: center;
 }
-
 .nav-link {
   color: #6c757d;
   text-decoration: none;
@@ -148,26 +205,67 @@ export default {
   transition: all 0.2s ease;
   position: relative;
 }
-
-.nav-link:hover {
-  color: #3498db;
-  text-decoration: none;
-}
-
-.nav-link.active {
-  color: #3498db;
-}
-
+.nav-link:hover { color: #6c63ff; text-decoration: none; }
+.nav-link.active { color: #6c63ff; }
 .nav-link.active::after {
   content: "";
   position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background-color: #3498db;
+  bottom: 0; left: 0;
+  width: 100%; height: 2px;
+  background-color: #6c63ff;
+  border-radius: 2px;
 }
 
+/* ─── Nav user section ───────────────────────────────────────────────────── */
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-left: auto;
+}
+.user-avatar {
+  width: 34px; height: 34px;
+  background: linear-gradient(135deg, #6c63ff, #4fc3f7);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.username-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #2c3e50;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  font-family: inherit;
+}
+.logout-btn svg { width: 15px; height: 15px; }
+.logout-btn:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+/* ─── Main content ───────────────────────────────────────────────────────── */
 .main-container {
   flex: 1;
   max-width: 1400px;
@@ -177,9 +275,12 @@ export default {
   overflow: hidden;
 }
 
+/* ─── Page transition ────────────────────────────────────────────────────── */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
 @media (max-width: 768px) {
-  .nav-container {
-    padding: 0 1rem;
-  }
+  .nav-container { padding: 0 1rem; }
+  .username-label { display: none; }
 }
 </style>

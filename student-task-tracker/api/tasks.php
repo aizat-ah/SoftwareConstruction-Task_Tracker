@@ -3,7 +3,6 @@ require_once 'config.php';
 
 // Handle preflight OPTIONS request
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    // Send CORS headers for preflight request
     header('Access-Control-Allow-Origin: *');
     header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
@@ -12,9 +11,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-
 // Get database connection
 $conn = getDBConnection();
+
+// Validate Bearer token — returns the authenticated user's ID
+$authUserId = _requireAuth($conn);
 
 // Get the request method
 $method = $_SERVER['REQUEST_METHOD'];
@@ -24,18 +25,23 @@ $request_uri = $_SERVER['REQUEST_URI'];
 $path = parse_url($request_uri, PHP_URL_PATH);
 $path_parts = explode('/', trim($path, '/'));
 
-// Get the task ID if it exists
-$task_id = isset($path_parts[2]) ? $path_parts[2] : null;
+// Support both local dev (/tasks/5) and App Engine (/index.php/tasks/5)
+// Find the 'tasks' segment and take the part after it as the ID
+$task_id = null;
+$tasks_index = array_search('tasks', $path_parts);
+if ($tasks_index !== false && isset($path_parts[$tasks_index + 1]) && $path_parts[$tasks_index + 1] !== '') {
+    $task_id = $path_parts[$tasks_index + 1];
+}
 
 // Handle different HTTP methods
 switch ($method) {
     case 'GET':
         if ($task_id) {
-            // Get a single task
-            $stmt = $conn->prepare("SELECT * FROM tasks WHERE id = ?");
-            $stmt->execute([$task_id]);
+            // Get a single task — scoped to the authenticated user
+            $stmt = $conn->prepare("SELECT * FROM tasks WHERE id = ? AND user_id = ?");
+            $stmt->execute([$task_id, $authUserId]);
             $task = $stmt->fetch(PDO::FETCH_ASSOC);
-            
+
             if ($task) {
                 echo json_encode($task);
             } else {
@@ -43,38 +49,41 @@ switch ($method) {
                 echo json_encode(['error' => 'Task not found']);
             }
         } else {
-            // Get all tasks
-            $stmt = $conn->query("SELECT * FROM tasks ORDER BY dueDate DESC");
+            // Get only tasks belonging to the authenticated user
+            $stmt = $conn->prepare("SELECT * FROM tasks WHERE user_id = ? ORDER BY dueDate DESC");
+            $stmt->execute([$authUserId]);
             $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
             echo json_encode($tasks);
         }
         break;
 
     case 'POST':
-        // Create a new task
+        // Create a new task — always tied to the authenticated user
         $data = json_decode(file_get_contents('php://input'), true);
-        
+
         if (!isset($data['title']) || !isset($data['description']) || !isset($data['dueDate']) || !isset($data['status'])) {
             http_response_code(400);
             echo json_encode(['error' => 'Missing required fields']);
             break;
         }
 
-        $stmt = $conn->prepare("INSERT INTO tasks (title, description, dueDate, status) VALUES (?, ?, ?, ?)");
+        $stmt = $conn->prepare("INSERT INTO tasks (title, description, dueDate, status, user_id) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([
             $data['title'],
             $data['description'],
             $data['dueDate'],
-            $data['status']
+            $data['status'],
+            $authUserId,
         ]);
 
         $data['id'] = $conn->lastInsertId();
+        $data['user_id'] = $authUserId;
         http_response_code(201);
         echo json_encode($data);
         break;
 
     case 'PUT':
-        // Update an existing task
+        // Update a task — only if it belongs to the authenticated user
         if (!$task_id) {
             http_response_code(400);
             echo json_encode(['error' => 'Task ID is required']);
@@ -82,20 +91,21 @@ switch ($method) {
         }
 
         $data = json_decode(file_get_contents('php://input'), true);
-        
+
         if (!isset($data['title']) || !isset($data['description']) || !isset($data['dueDate']) || !isset($data['status'])) {
             http_response_code(400);
             echo json_encode(['error' => 'Missing required fields']);
             break;
         }
 
-        $stmt = $conn->prepare("UPDATE tasks SET title = ?, description = ?, dueDate = ?, status = ? WHERE id = ?");
+        $stmt = $conn->prepare("UPDATE tasks SET title = ?, description = ?, dueDate = ?, status = ? WHERE id = ? AND user_id = ?");
         $stmt->execute([
             $data['title'],
             $data['description'],
             $data['dueDate'],
             $data['status'],
-            $task_id
+            $task_id,
+            $authUserId,
         ]);
 
         if ($stmt->rowCount() > 0) {
@@ -108,15 +118,15 @@ switch ($method) {
         break;
 
     case 'DELETE':
-        // Delete a task
+        // Delete a task — only if it belongs to the authenticated user
         if (!$task_id) {
             http_response_code(400);
             echo json_encode(['error' => 'Task ID is required']);
             break;
         }
 
-        $stmt = $conn->prepare("DELETE FROM tasks WHERE id = ?");
-        $stmt->execute([$task_id]);
+        $stmt = $conn->prepare("DELETE FROM tasks WHERE id = ? AND user_id = ?");
+        $stmt->execute([$task_id, $authUserId]);
 
         if ($stmt->rowCount() > 0) {
             http_response_code(204);
@@ -131,4 +141,40 @@ switch ($method) {
         echo json_encode(['error' => 'Method not allowed']);
         break;
 }
-?> 
+
+// ─── Auth helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Validates the Bearer token and returns the authenticated user's ID.
+ * Exits with 401 if the token is missing or invalid.
+ */
+function _requireAuth($conn): int {
+    $token = _extractBearerToken();
+    if (!$token) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Unauthorized: No token provided']);
+        exit();
+    }
+    $stmt = $conn->prepare("SELECT id FROM users WHERE auth_token = ?");
+    $stmt->execute([$token]);
+    $user = $stmt->fetch();
+    if (!$user) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Unauthorized: Invalid or expired token']);
+        exit();
+    }
+    return (int) $user['id'];
+}
+
+function _extractBearerToken(): ?string {
+    $headers = function_exists('getallheaders') ? getallheaders() : [];
+    $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+    if ($authHeader === '') {
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    }
+    if (preg_match('/Bearer\s+(\S+)/i', $authHeader, $matches)) {
+        return $matches[1];
+    }
+    return null;
+}
+?>

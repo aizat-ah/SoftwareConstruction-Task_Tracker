@@ -71,6 +71,9 @@ switch ($action) {
         $stmt->execute([$username, $email, $hashedPassword, $token]);
         $userId = $conn->lastInsertId();
 
+        // Send welcome email
+        sendEmail($email, "Welcome to Task Tracker!", "<p>Hi <b>$username</b>,</p><p>Welcome to your new Task Tracker account. We're excited to have you on board!</p>");
+
         http_response_code(201);
         echo json_encode([
             'token' => $token,

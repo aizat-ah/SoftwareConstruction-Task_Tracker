@@ -78,6 +78,18 @@ switch ($method) {
 
         $data['id'] = $conn->lastInsertId();
         $data['user_id'] = $authUserId;
+
+        // Send email notification
+        $stmtUser = $conn->prepare("SELECT email FROM users WHERE id = ?");
+        $stmtUser->execute([$authUserId]);
+        $userRow = $stmtUser->fetch();
+        if ($userRow) {
+            $userEmail = $userRow['email'];
+            $taskTitle = htmlspecialchars($data['title']);
+            $dueDate = htmlspecialchars($data['dueDate']);
+            sendEmail($userEmail, "New Task Created: $taskTitle", "<p>You have successfully created a new task: <b>$taskTitle</b></p><p>Due Date: $dueDate</p>");
+        }
+
         http_response_code(201);
         echo json_encode($data);
         break;

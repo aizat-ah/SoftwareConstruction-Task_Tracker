@@ -47,3 +47,44 @@ export const taskService = {
     return api.delete(`/tasks/${id}`);
   },
 };
+
+export const subtaskService = {
+  // Get all subtasks for a task
+  getSubtasks(taskId) {
+    return api.get(`/subtasks/task/${taskId}`);
+  },
+
+  // Create a new subtask under a task
+  createSubtask(taskId, title) {
+    return api.post(`/subtasks/task/${taskId}`, { title });
+  },
+
+  // Update a subtask's title/completed/sort_order (partial update)
+  updateSubtask(id, changes) {
+    return api.put(`/subtasks/${id}`, changes);
+  },
+
+  // Toggle a subtask's completed state
+  toggleSubtask(id, isCompleted) {
+    return api.put(`/subtasks/${id}`, { is_completed: isCompleted });
+  },
+
+  // Persist a new sort order for a set of subtasks
+  reorderSubtasks(orderedIds) {
+    return Promise.all(
+      orderedIds.map((id, index) =>
+        api.put(`/subtasks/${id}`, { sort_order: index })
+      )
+    );
+  },
+
+  // Delete a subtask
+  deleteSubtask(id) {
+    return api.delete(`/subtasks/${id}`);
+  },
+
+  // Delete all completed subtasks for a task in one request
+  clearCompleted(taskId) {
+    return api.delete(`/subtasks/task/${taskId}/completed`);
+  },
+};

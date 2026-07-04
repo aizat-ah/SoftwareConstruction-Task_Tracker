@@ -106,6 +106,36 @@
           </b-badge>
         </template>
 
+        <template #cell(checklist)="data">
+          <div class="checklist-cell">
+            <div class="checklist-progress-info">
+              <b-progress
+                :max="100"
+                height="6px"
+                class="checklist-mini-progress"
+              >
+                <b-progress-bar
+                  :value="getProgressPercent(data.item.id)"
+                  :variant="getProgressVariant(data.item.id)"
+                />
+              </b-progress>
+              <span class="checklist-count">
+                {{ getCompletedCount(data.item.id) }}/{{
+                  getTotalCount(data.item.id)
+                }}
+              </span>
+            </div>
+            <b-button
+              variant="outline-secondary"
+              size="sm"
+              class="checklist-btn"
+              @click="openChecklist(data.item)"
+            >
+              <i class="fas fa-list-check"></i>
+            </b-button>
+          </div>
+        </template>
+
         <template #cell(actions)="data">
           <div class="action-buttons">
             <b-button
@@ -128,14 +158,41 @@
         </template>
       </b-table>
     </div>
+
+    <b-modal
+      v-model="showChecklist"
+      title-tag="div"
+      hide-footer
+      content-class="checklist-modal-content"
+      @hide="closeChecklist"
+    >
+      <template #title>
+        <div class="checklist-modal-title">
+          <span class="checklist-eyebrow">
+            <i class="fas fa-list-check"></i> Checklist
+          </span>
+          <div class="checklist-modal-task">
+            {{ selectedTaskForChecklist ? selectedTaskForChecklist.title : "" }}
+          </div>
+        </div>
+      </template>
+      <SubtaskChecklist
+        v-if="selectedTaskForChecklist"
+        :task-id="selectedTaskForChecklist.id"
+      />
+    </b-modal>
   </div>
 </template>
 
 <script>
-import { taskService } from "../services/api";
+import { taskService, subtaskService } from "../services/api";
+import SubtaskChecklist from "./SubtaskChecklist.vue";
 
 export default {
   name: "TaskList",
+  components: {
+    SubtaskChecklist,
+  },
   data() {
     return {
       fields: [
@@ -176,6 +233,12 @@ export default {
           thClass: "status-column",
         },
         {
+          key: "checklist",
+          label: "Checklist",
+          tdClass: "checklist-column",
+          thClass: "checklist-column",
+        },
+        {
           key: "actions",
           label: "Actions",
           tdClass: "actions-column",
@@ -183,6 +246,9 @@ export default {
         },
       ],
       tasks: [],
+      subtaskSummaries: {},
+      showChecklist: false,
+      selectedTaskForChecklist: null,
       sortBy: "dueDate",
       sortDesc: true,
       selectedFilter: "all",
@@ -239,12 +305,60 @@ export default {
       try {
         const response = await taskService.getAllTasks();
         this.tasks = response.data;
+        await this.loadSubtasksForTasks();
       } catch (error) {
         this.error = "Failed to load tasks. Please try again later.";
         console.error("Error loading tasks:", error);
       } finally {
         this.loading = false;
       }
+    },
+    async loadSubtasksForTasks() {
+      const summaries = {};
+      await Promise.all(
+        this.tasks.map(async (task) => {
+          try {
+            const response = await subtaskService.getSubtasks(task.id);
+            const subtasks = response.data;
+            summaries[task.id] = {
+              completed: subtasks.filter((s) => s.is_completed).length,
+              total: subtasks.length,
+            };
+          } catch (error) {
+            summaries[task.id] = { completed: 0, total: 0 };
+            console.error(`Error loading subtasks for task ${task.id}:`, error);
+          }
+        })
+      );
+      this.subtaskSummaries = summaries;
+    },
+    getCompletedCount(taskId) {
+      return this.subtaskSummaries[taskId]?.completed ?? 0;
+    },
+    getTotalCount(taskId) {
+      return this.subtaskSummaries[taskId]?.total ?? 0;
+    },
+    getProgressPercent(taskId) {
+      const total = this.getTotalCount(taskId);
+      if (total === 0) return 0;
+      return Math.round((this.getCompletedCount(taskId) / total) * 100);
+    },
+    getProgressVariant(taskId) {
+      const percent = this.getProgressPercent(taskId);
+      if (percent < 30) return "danger";
+      if (percent < 70) return "warning";
+      return "success";
+    },
+    openChecklist(task) {
+      this.selectedTaskForChecklist = task;
+      this.showChecklist = true;
+    },
+    async closeChecklist() {
+      this.showChecklist = false;
+      this.selectedTaskForChecklist = null;
+      // Reload tasks (not just subtask counts) so status changes made by the
+      // backend's auto-sync while the modal was open show up immediately.
+      await this.loadTasks();
     },
     async deleteTask(id) {
       if (confirm("Are you sure you want to delete this task?")) {
@@ -411,23 +525,27 @@ export default {
 }
 
 .title-column {
-  width: 17%;
+  width: 14%;
 }
 
 .description-column {
-  width: 30%;
+  width: 22%;
 }
 
 .date-column {
-  width: 20%;
+  width: 16%;
 }
 
 .status-column {
-  width: 12%;
+  width: 10%;
+}
+
+.checklist-column {
+  width: 15%;
 }
 
 .actions-column {
-  width: 13%;
+  width: 15%;
 }
 
 .custom-table >>> thead th {
@@ -452,6 +570,12 @@ export default {
   text-overflow: ellipsis;
 }
 
+.custom-table >>> tbody td.description-column {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
 .task-title {
   font-weight: 500;
   color: #2c3e50;
@@ -463,16 +587,76 @@ export default {
 
 .task-description {
   color: #6c757d;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
   display: block;
+  line-height: 1.4;
+  text-align: justify;
 }
 
 .date-container {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.checklist-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.checklist-progress-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.checklist-mini-progress {
+  width: 100%;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.checklist-count {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+.checklist-btn {
+  flex-shrink: 0;
+}
+
+.checklist-modal-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.checklist-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0d6efd;
+}
+
+.checklist-modal-task {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+:deep(.checklist-modal-content) {
+  border-radius: 14px;
+  border: none;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
 }
 
 .date {

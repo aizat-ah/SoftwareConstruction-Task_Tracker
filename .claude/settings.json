@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"Frontend: %{http_code}\\\\n\" http://localhost:8080/)",
+      "Bash(curl -s -w \"\\\\nAPI-via-proxy: %{http_code}\\\\n\" http://localhost:8080/api/tasks)",
+      "Bash(php -l \"student-task-tracker/api/subtasks.php\")",
+      "Bash(php -l \"student-task-tracker/api/router.php\")",
+      "Bash(powershell.exe -NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\\\"Name='php.exe' or Name='node.exe'\\\\\" | Select-Object ProcessId,CommandLine\")"
+    ]
+  }
+}

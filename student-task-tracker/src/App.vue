@@ -39,8 +39,15 @@
 
             <!-- User info + Logout -->
             <div class="nav-user">
-              <div class="user-avatar">{{ userInitial }}</div>
-              <span class="username-label">{{ currentUser.username }}</span>
+              <button
+                class="user-chip"
+                :class="{ active: currentView === 'profile' }"
+                @click="currentView = 'profile'"
+                title="View profile"
+              >
+                <div class="user-avatar">{{ userInitial }}</div>
+                <span class="username-label">{{ currentUser.username }}</span>
+              </button>
               <button class="logout-btn" @click="handleLogout" id="logout-btn" title="Sign out">
                 <svg viewBox="0 0 24 24" fill="none">
                   <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -61,6 +68,8 @@
             @task-saved="handleTaskSaved"
             @cancel="currentView = 'tasks'"
             @add-task="handleAddTask"
+            @profile-updated="handleProfileUpdated"
+            @account-deleted="handleAccountDeleted"
           />
         </div>
       </div>
@@ -74,6 +83,7 @@ import TaskList from "./components/TaskList.vue";
 import TaskForm from "./components/TaskForm.vue";
 import LoginPage from "./components/LoginPage.vue";
 import RegisterPage from "./components/RegisterPage.vue";
+import Profile from "./components/Profile.vue";
 import { authService } from "./services/auth";
 
 export default {
@@ -84,6 +94,7 @@ export default {
     TaskForm,
     LoginPage,
     RegisterPage,
+    Profile,
   },
   data() {
     return {
@@ -104,6 +115,7 @@ export default {
         case "tasks":      return "TaskList";
         case "add-task":   return "TaskForm";
         case "edit-task":  return "TaskForm";
+        case "profile":    return "Profile";
         default:           return "TaskDashboard";
       }
     },
@@ -139,6 +151,21 @@ export default {
     handleAddTask() {
       this.selectedTask = null;
       this.currentView = "add-task";
+    },
+
+    // Keep navbar in sync after the user edits their profile
+    handleProfileUpdated(user) {
+      if (user) {
+        this.currentUser = { ...this.currentUser, ...user };
+      }
+    },
+
+    // Account was deleted — session is already cleared, return to login
+    handleAccountDeleted() {
+      this.isAuthenticated = false;
+      this.currentUser = {};
+      this.currentView = "dashboard";
+      this.authView = "login";
     },
   },
 };
@@ -223,6 +250,20 @@ export default {
   gap: 0.6rem;
   margin-left: auto;
 }
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem 0.2rem 0.2rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s, border-color 0.2s;
+}
+.user-chip:hover { background: rgba(108, 99, 255, 0.06); }
+.user-chip.active { border-color: rgba(108, 99, 255, 0.4); }
 .user-avatar {
   width: 34px; height: 34px;
   background: linear-gradient(135deg, #6c63ff, #4fc3f7);

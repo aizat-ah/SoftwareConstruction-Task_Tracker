@@ -5,6 +5,15 @@ const authApi = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+// Attach the Bearer token to every auth request automatically
+authApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem("auth_token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export const authService = {
   /**
    * Register a new user. Automatically saves the session on success.
@@ -52,7 +61,66 @@ export const authService = {
     }
   },
 
+  /**
+   * Fetch the current user's profile (fresh from the server).
+   */
+  async getProfile() {
+    const response = await authApi.get("/auth?action=profile");
+    return response.data;
+  },
+
+  /**
+   * Update the current user's username and email.
+   * Keeps the locally stored user in sync on success.
+   */
+  async updateProfile(username, email) {
+    const response = await authApi.post("/auth?action=update_profile", {
+      username,
+      email,
+    });
+    if (response.data.user) {
+      this._updateStoredUser(response.data.user);
+    }
+    return response.data;
+  },
+
+  /**
+   * Change the current user's password.
+   */
+  async changePassword(currentPassword, newPassword) {
+    const response = await authApi.post("/auth?action=change_password", {
+      currentPassword,
+      newPassword,
+    });
+    // The server rotates the auth token on password change — store the fresh
+    // one so the session stays valid and no re-login is needed.
+    if (response.data.token) {
+      localStorage.setItem("auth_token", response.data.token);
+    }
+    return response.data;
+  },
+
+  /**
+   * Delete the current user's account, then clear the local session.
+   */
+  async deleteAccount() {
+    const response = await authApi.post("/auth?action=delete_account", {});
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
+    return response.data;
+  },
+
   // ─── Helpers ────────────────────────────────────────────────────────────────
+
+  /**
+   * Merge fields into the stored user without touching the token.
+   */
+  _updateStoredUser(partialUser) {
+    const current = this.getUser() || {};
+    const merged = { ...current, ...partialUser };
+    localStorage.setItem("auth_user", JSON.stringify(merged));
+    return merged;
+  },
 
   _saveSession(data) {
     localStorage.setItem("auth_token", data.token);

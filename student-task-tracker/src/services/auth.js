@@ -63,21 +63,19 @@ export const authService = {
 
   /**
    * Fetch the current user's profile (fresh from the server).
+   * GET /profile
    */
   async getProfile() {
-    const response = await authApi.get("/auth?action=profile");
+    const response = await authApi.get("/profile");
     return response.data;
   },
 
   /**
    * Update the current user's username and email.
-   * Keeps the locally stored user in sync on success.
+   * PUT /profile — keeps the locally stored user in sync on success.
    */
   async updateProfile(username, email) {
-    const response = await authApi.post("/auth?action=update_profile", {
-      username,
-      email,
-    });
+    const response = await authApi.put("/profile", { username, email });
     if (response.data.user) {
       this._updateStoredUser(response.data.user);
     }
@@ -86,9 +84,10 @@ export const authService = {
 
   /**
    * Change the current user's password.
+   * PUT /profile/password
    */
   async changePassword(currentPassword, newPassword) {
-    const response = await authApi.post("/auth?action=change_password", {
+    const response = await authApi.put("/profile/password", {
       currentPassword,
       newPassword,
     });
@@ -102,9 +101,10 @@ export const authService = {
 
   /**
    * Delete the current user's account, then clear the local session.
+   * DELETE /profile
    */
   async deleteAccount() {
-    const response = await authApi.post("/auth?action=delete_account", {});
+    const response = await authApi.delete("/profile");
     localStorage.removeItem("auth_token");
     localStorage.removeItem("auth_user");
     return response.data;

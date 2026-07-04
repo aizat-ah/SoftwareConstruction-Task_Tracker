@@ -13,123 +13,137 @@
       </div>
     </div>
 
-    <!-- Statistics Cards -->
-    <b-row class="stats-row">
-      <b-col md="3">
-        <div class="stat-card primary">
-          <div class="stat-content">
-            <div class="stat-icon">
-              <i class="fas fa-tasks"></i>
+    <!-- Dashboard grid: left content + right study column -->
+    <div class="dash-grid">
+      <!-- LEFT: stats, then charts + deadlines side by side -->
+      <div class="left-area">
+        <!-- Statistics Cards -->
+        <b-row class="stats-row">
+          <b-col md="3" sm="6" class="stat-col">
+            <div class="stat-card primary">
+              <div class="stat-content">
+                <div class="stat-icon">
+                  <i class="fas fa-tasks"></i>
+                </div>
+                <h3 class="stat-number">{{ totalTasks }}</h3>
+                <p class="stat-label">Total Tasks</p>
+              </div>
             </div>
-            <h3 class="stat-number">{{ totalTasks }}</h3>
-            <p class="stat-label">Total Tasks</p>
-          </div>
-        </div>
-      </b-col>
-      <b-col md="3">
-        <div class="stat-card success">
-          <div class="stat-content">
-            <div class="stat-icon">
-              <i class="fas fa-check-circle"></i>
+          </b-col>
+          <b-col md="3" sm="6" class="stat-col">
+            <div class="stat-card success">
+              <div class="stat-content">
+                <div class="stat-icon">
+                  <i class="fas fa-check-circle"></i>
+                </div>
+                <h3 class="stat-number">{{ completedTasks }}</h3>
+                <p class="stat-label">Completed Tasks</p>
+              </div>
             </div>
-            <h3 class="stat-number">{{ completedTasks }}</h3>
-            <p class="stat-label">Completed Tasks</p>
-          </div>
-        </div>
-      </b-col>
-      <b-col md="3">
-        <div class="stat-card warning">
-          <div class="stat-content">
-            <div class="stat-icon">
-              <i class="fas fa-clock"></i>
+          </b-col>
+          <b-col md="3" sm="6" class="stat-col">
+            <div class="stat-card warning">
+              <div class="stat-content">
+                <div class="stat-icon">
+                  <i class="fas fa-clock"></i>
+                </div>
+                <h3 class="stat-number">{{ pendingTasks }}</h3>
+                <p class="stat-label">Pending Tasks</p>
+              </div>
             </div>
-            <h3 class="stat-number">{{ pendingTasks }}</h3>
-            <p class="stat-label">Pending Tasks</p>
-          </div>
-        </div>
-      </b-col>
-      <b-col md="3">
-        <div class="stat-card info">
-          <div class="stat-content">
-            <div class="stat-icon">
-              <i class="fas fa-spinner"></i>
+          </b-col>
+          <b-col md="3" sm="6" class="stat-col">
+            <div class="stat-card info">
+              <div class="stat-content">
+                <div class="stat-icon">
+                  <i class="fas fa-spinner"></i>
+                </div>
+                <h3 class="stat-number">{{ inProgressTasks }}</h3>
+                <p class="stat-label">In Progress</p>
+              </div>
             </div>
-            <h3 class="stat-number">{{ inProgressTasks }}</h3>
-            <p class="stat-label">In Progress</p>
-          </div>
-        </div>
-      </b-col>
-    </b-row>
+          </b-col>
+        </b-row>
 
-    <!-- Charts and Stats Section -->
-    <b-row class="content-row">
-      <b-col lg="4">
-        <div class="chart-card">
-          <h3 class="chart-title">
-            <i class="fas fa-chart-pie"></i>
-            Tasks by Status
-          </h3>
-          <div class="chart-container">
-            <PieChart :data="statusChartData" :options="pieChartOptions" />
-          </div>
-        </div>
-      </b-col>
+        <!-- Charts + deadlines, all in one row so nothing is pushed below -->
+        <b-row class="charts-row">
+          <b-col md="6" class="chart-col">
+            <div class="chart-card">
+              <h3 class="chart-title">
+                <i class="fas fa-chart-pie"></i>
+                Tasks by Status
+              </h3>
+              <div class="chart-container">
+                <PieChart :data="statusChartData" :options="pieChartOptions" />
+              </div>
+            </div>
+          </b-col>
 
-      <b-col lg="4">
-        <div class="chart-card">
-          <h3 class="chart-title">
-            <i class="fas fa-chart-bar"></i>
-            Tasks Due This Week
-          </h3>
-          <div class="chart-container">
-            <BarChart :data="dueDateChartData" :options="barChartOptions" />
-          </div>
-        </div>
-      </b-col>
+          <b-col md="6" class="chart-col">
+            <div class="chart-card">
+              <h3 class="chart-title">
+                <i class="fas fa-chart-bar"></i>
+                Tasks Due This Week
+              </h3>
+              <div class="chart-container">
+                <BarChart :data="dueDateChartData" :options="barChartOptions" />
+              </div>
+            </div>
+          </b-col>
+        </b-row>
 
-      <b-col lg="4">
-        <div class="info-card deadline-card">
-          <h3 class="info-title">
-            <i class="fas fa-calendar-alt"></i>
-            <span>Upcoming Deadlines</span>
-            <span class="subtitle">for the next 7 days</span>
-          </h3>
-          <div class="deadline-list">
-            <div
-              v-for="task in upcomingDeadlines"
-              :key="task.id"
-              class="deadline-item"
-            >
-              <div class="deadline-info">
-                <span class="deadline-title">{{ task.title }}</span>
-                <div class="deadline-details">
-                  <span
-                    :class="[
-                      'deadline-date',
-                      isUrgent(task.dueDate) ? 'urgent' : '',
-                    ]"
-                  >
-                    {{ formatDate(task.dueDate) }}
-                  </span>
-                  <span
-                    class="remaining-days"
-                    :class="getRemainingDaysClass(task.dueDate)"
-                  >
-                    {{ getRemainingDays(task.dueDate) }}
-                  </span>
+        <!-- Upcoming deadlines: full width, below the two charts -->
+        <b-row class="deadline-row">
+          <b-col cols="12" class="chart-col">
+            <div class="info-card deadline-card">
+              <h3 class="info-title">
+                <i class="fas fa-calendar-alt"></i>
+                <span>Upcoming Deadlines</span>
+                <span class="subtitle">next 7 days</span>
+              </h3>
+              <div class="deadline-list">
+                <div
+                  v-for="task in upcomingDeadlines"
+                  :key="task.id"
+                  class="deadline-item"
+                >
+                  <div class="deadline-info">
+                    <span class="deadline-title">{{ task.title }}</span>
+                    <div class="deadline-details">
+                      <span
+                        :class="[
+                          'deadline-date',
+                          isUrgent(task.dueDate) ? 'urgent' : '',
+                        ]"
+                      >
+                        {{ formatDate(task.dueDate) }}
+                      </span>
+                      <span
+                        class="remaining-days"
+                        :class="getRemainingDaysClass(task.dueDate)"
+                      >
+                        {{ getRemainingDays(task.dueDate) }}
+                      </span>
+                    </div>
+                  </div>
+                  <b-badge :variant="getStatusVariant(task.status)">{{
+                    task.status
+                  }}</b-badge>
+                </div>
+                <div v-if="upcomingDeadlines.length === 0" class="no-deadlines">
+                  No upcoming deadlines
                 </div>
               </div>
-              <b-badge :variant="getStatusVariant(task.status)">{{
-                task.status
-              }}</b-badge>
             </div>
-            <div v-if="upcomingDeadlines.length === 0" class="no-deadlines">
-              No upcoming deadlines
-            </div>
-          </div>
-        </div>
-      </b-col>
-    </b-row>
+          </b-col>
+        </b-row>
+      </div>
+
+      <!-- RIGHT: motivation quote -->
+      <div class="right-study">
+        <MotivationQuote />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -147,6 +161,7 @@ import {
   BarElement,
 } from "chart.js";
 import { taskService } from "../services/api";
+import MotivationQuote from "./MotivationQuote.vue";
 
 // Register Chart.js components
 ChartJS.register(
@@ -164,6 +179,7 @@ export default {
   components: {
     PieChart,
     BarChart,
+    MotivationQuote,
   },
   inject: ["router"],
   data() {
@@ -509,14 +525,56 @@ export default {
   background: linear-gradient(135deg, #00bcd4 0%, #0097a7 100%);
 }
 
-.content-row {
+/* Two-column dashboard: left content + fixed right study column */
+.dash-grid {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
   flex-grow: 1;
   min-height: 0;
-  margin: 0 -10px;
 }
 
-.content-row > [class*="col-"] {
+.left-area {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Right study column starts at the top, next to the stat cards */
+.right-study {
+  flex: 0 0 300px;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.charts-row,
+.deadline-row {
+  margin: 0 -10px;
+}
+.chart-col {
   padding: 0 10px;
+  margin-bottom: 20px;
+}
+.stat-col {
+  margin-bottom: 20px;
+}
+
+/* Right study column: compact Pomodoro on top, quote sized like a chart card */
+.right-study :deep(.quote-card) {
+  flex: 1;
+  min-height: 300px;
+}
+
+/* Stack the study column under the content on narrower screens */
+@media (max-width: 991px) {
+  .dash-grid {
+    flex-direction: column;
+  }
+  .right-study {
+    flex: none;
+    width: 100%;
+  }
 }
 
 .chart-card,
@@ -529,22 +587,22 @@ export default {
 }
 
 .chart-container {
-  height: 300px;
+  height: 250px;
 }
 
 .deadline-list {
-  height: 300px;
-  overflow-y: auto;
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
-  display: flex;
-  flex-direction: column;
+  height: auto;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
   padding: 10px 5px;
 }
 
-.deadline-list::-webkit-scrollbar {
-  display: none; /* Chrome, Safari and Opera */
+/* Collapse to a single column on very narrow screens */
+@media (max-width: 575px) {
+  .deadline-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 .deadline-item {

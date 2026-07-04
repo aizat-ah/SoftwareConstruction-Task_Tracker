@@ -72,6 +72,9 @@
             @account-deleted="handleAccountDeleted"
           />
         </div>
+
+        <!-- Floating Pomodoro widget: available on every page while signed in -->
+        <FloatingPomodoro />
       </div>
     </transition>
   </div>
@@ -84,6 +87,7 @@ import TaskForm from "./components/TaskForm.vue";
 import LoginPage from "./components/LoginPage.vue";
 import RegisterPage from "./components/RegisterPage.vue";
 import Profile from "./components/Profile.vue";
+import FloatingPomodoro from "./components/FloatingPomodoro.vue";
 import { authService } from "./services/auth";
 
 export default {
@@ -95,6 +99,7 @@ export default {
     LoginPage,
     RegisterPage,
     Profile,
+    FloatingPomodoro,
   },
   data() {
     return {

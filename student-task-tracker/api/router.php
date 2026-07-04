@@ -7,6 +7,7 @@
  *
  * Routes:
  *   /auth*      → auth.php     (register / login / logout)
+ *   /profile*   → profile.php  (view / update / delete / change password)
  *   /tasks*     → tasks.php    (CRUD)
  *   /subtasks*  → subtasks.php (CRUD)
  */
@@ -24,7 +25,7 @@ $urlPath   = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $pathParts = explode('/', trim($urlPath, '/'));
 
 $segment = null;
-foreach (['auth', 'subtasks', 'tasks'] as $route) {
+foreach (['auth', 'profile', 'subtasks', 'tasks'] as $route) {
     if (in_array($route, $pathParts)) {
         $segment = $route;
         break;
@@ -34,6 +35,9 @@ foreach (['auth', 'subtasks', 'tasks'] as $route) {
 switch ($segment) {
     case 'auth':
         require __DIR__ . '/auth.php';
+        break;
+    case 'profile':
+        require __DIR__ . '/profile.php';
         break;
     case 'subtasks':
         require __DIR__ . '/subtasks.php';

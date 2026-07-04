@@ -13,12 +13,8 @@
       </div>
     </div>
 
-    <!-- Dashboard grid: left content + right study column -->
-    <div class="dash-grid">
-      <!-- LEFT: stats, then charts + deadlines side by side -->
-      <div class="left-area">
-        <!-- Statistics Cards -->
-        <b-row class="stats-row">
+    <!-- Statistics Cards: full width across the top -->
+    <b-row class="stats-row">
           <b-col md="3" sm="6" class="stat-col">
             <div class="stat-card primary">
               <div class="stat-content">
@@ -63,9 +59,11 @@
               </div>
             </div>
           </b-col>
-        </b-row>
+    </b-row>
 
-        <!-- Charts + deadlines, all in one row so nothing is pushed below -->
+    <!-- Dashboard grid: charts + deadlines on the left, quote on the right -->
+    <div class="dash-grid">
+      <div class="left-area">
         <b-row class="charts-row">
           <b-col md="6" class="chart-col">
             <div class="chart-card">
@@ -529,7 +527,7 @@ export default {
 .dash-grid {
   display: flex;
   gap: 20px;
-  align-items: flex-start;
+  align-items: stretch;
   flex-grow: 1;
   min-height: 0;
 }

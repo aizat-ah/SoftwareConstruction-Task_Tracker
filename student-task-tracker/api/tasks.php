@@ -87,7 +87,27 @@ switch ($method) {
             $userEmail = $userRow['email'];
             $taskTitle = htmlspecialchars($data['title']);
             $dueDate = htmlspecialchars($data['dueDate']);
-            sendEmail($userEmail, "New Task Created: $taskTitle", "<p>You have successfully created a new task: <b>$taskTitle</b></p><p>Due Date: $dueDate</p>");
+            
+            $body = "
+            <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e1e1e1; border-radius: 8px; background-color: #f9f9f9;'>
+                <div style='text-align: center; margin-bottom: 20px;'>
+                    <h2 style='color: #4CAF50; margin: 0;'>New Task Created</h2>
+                </div>
+                <div style='background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);'>
+                    <p style='font-size: 16px; color: #333333;'>Hello,</p>
+                    <p style='font-size: 16px; color: #333333;'>You have successfully created a new task in your task tracker.</p>
+                    
+                    <div style='background-color: #e8f5e9; border-left: 4px solid #4CAF50; padding: 15px; margin: 20px 0;'>
+                        <h3 style='margin: 0 0 10px 0; color: #333333;'>{$taskTitle}</h3>
+                        <p style='margin: 0; color: #666666;'><strong>Due Date:</strong> {$dueDate}</p>
+                    </div>
+                    
+                    <p style='font-size: 16px; color: #333333;'>Keep up the good work and stay organized!</p>
+                </div>
+            </div>
+            ";
+            
+            sendEmail($userEmail, "New Task Created: $taskTitle", $body);
         }
 
         http_response_code(201);

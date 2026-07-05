@@ -25,22 +25,41 @@ $request_uri = $_SERVER['REQUEST_URI'];
 $path = parse_url($request_uri, PHP_URL_PATH);
 $path_parts = explode('/', trim($path, '/'));
 
-// Support both local dev (/subtasks/task/5, /subtasks/8) and App Engine
-// (/index.php/subtasks/task/5, /index.php/subtasks/8)
-// Also supports the batch cleanup route: /subtasks/task/5/completed
+// Supported URL shapes:
+//   Nested REST (assignment spec):
+//     GET|POST   /tasks/{taskId}/subtasks         → list / create under a task
+//   Flat routes (used by the app UI + single-subtask ops):
+//     GET|POST   /subtasks/task/{taskId}          → list / create
+//     PUT|DELETE /subtasks/{subtaskId}            → update / delete one
+//     DELETE     /subtasks/task/{taskId}/completed → clear all completed
+// Tolerant of an /index.php or /api prefix (App Engine / dev proxy).
+$tasks_index    = array_search('tasks', $path_parts);
 $subtasks_index = array_search('subtasks', $path_parts);
-$remainder = $subtasks_index !== false ? array_slice($path_parts, $subtasks_index + 1) : [];
 
 $task_id = null;
 $subtask_id = null;
 $clear_completed = false;
-if (isset($remainder[0]) && $remainder[0] === 'task' && isset($remainder[1]) && $remainder[1] !== '') {
-    $task_id = $remainder[1];
-    if (isset($remainder[2]) && $remainder[2] === 'completed') {
-        $clear_completed = true;
+
+if (
+    $tasks_index !== false
+    && $subtasks_index !== false
+    && $subtasks_index > $tasks_index
+    && isset($path_parts[$tasks_index + 1])
+    && $path_parts[$tasks_index + 1] !== ''
+) {
+    // Nested REST shape: /tasks/{taskId}/subtasks
+    $task_id = $path_parts[$tasks_index + 1];
+} elseif ($subtasks_index !== false) {
+    // Flat shapes: /subtasks/task/{taskId}[/completed] or /subtasks/{subtaskId}
+    $remainder = array_slice($path_parts, $subtasks_index + 1);
+    if (isset($remainder[0]) && $remainder[0] === 'task' && isset($remainder[1]) && $remainder[1] !== '') {
+        $task_id = $remainder[1];
+        if (isset($remainder[2]) && $remainder[2] === 'completed') {
+            $clear_completed = true;
+        }
+    } elseif (isset($remainder[0]) && $remainder[0] !== '') {
+        $subtask_id = $remainder[0];
     }
-} elseif (isset($remainder[0]) && $remainder[0] !== '') {
-    $subtask_id = $remainder[0];
 }
 
 switch ($method) {

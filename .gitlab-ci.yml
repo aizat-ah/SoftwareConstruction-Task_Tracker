@@ -1,0 +1,104 @@
+# ==========================================================================
+# GitLab CI/CD pipeline for the Student Task Tracker
+# Stack: Vue 3 (frontend) + PHP 8 API + MySQL
+#
+# Stages run in order: build -> test -> sonarqube-check -> deploy
+# The app lives in the student-task-tracker/ subfolder, so most jobs cd into it.
+# ==========================================================================
+
+stages:
+  - build
+  - test
+  - sonarqube-check
+  - deploy
+
+variables:
+  # Full git history so SonarQube can attribute issues to commits (blame)
+  GIT_DEPTH: "0"
+  # Keep the SonarQube scanner cache inside the project dir
+  SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
+
+# --------------------------------------------------------------------------
+# BUILD — compile the Vue frontend into static files (student-task-tracker/dist)
+# --------------------------------------------------------------------------
+build_frontend:
+  stage: build
+  image: node:18
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+      - student-task-tracker/node_modules/
+  script:
+    - cd student-task-tracker
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - student-task-tracker/dist/
+    expire_in: 1 week
+
+# --------------------------------------------------------------------------
+# TEST — static checks. Two parallel jobs: ESLint for the frontend,
+# php -l (syntax lint) for every PHP file in the API.
+# --------------------------------------------------------------------------
+lint_frontend:
+  stage: test
+  image: node:18
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+      - student-task-tracker/node_modules/
+  script:
+    - cd student-task-tracker
+    - npm ci
+    - npm run lint
+
+lint_php:
+  stage: test
+  image: php:8.2-cli
+  script:
+    - echo "Checking syntax of all PHP files in the API (excluding vendor/)..."
+    - find student-task-tracker/api -path '*/vendor/*' -prune -o -name "*.php" -print0 | xargs -0 -r -n1 php -l
+
+# --------------------------------------------------------------------------
+# SONARQUBE — send the code to your self-hosted SonarQube for quality analysis.
+# Set SONAR_HOST_URL and SONAR_TOKEN in:
+#   GitLab -> Settings -> CI/CD -> Variables  (mark SONAR_TOKEN as masked)
+# Config for what gets scanned lives in sonar-project.properties (repo root).
+# --------------------------------------------------------------------------
+sonarqube-check:
+  stage: sonarqube-check
+  image:
+    name: sonarsource/sonar-scanner-cli:latest
+    entrypoint: [""]
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
+  script:
+    - sonar-scanner
+  # Don't fail the whole pipeline if quality gate fails — remove this once
+  # you're comfortable enforcing the gate.
+  allow_failure: true
+  only:
+    - main
+    - merge_requests
+
+# --------------------------------------------------------------------------
+# DEPLOY (simulated) — prints the steps a real deployment would run.
+# Swap this for a real SSH deploy to your DigitalOcean Droplet later.
+# --------------------------------------------------------------------------
+deploy_simulated:
+  stage: deploy
+  image: alpine:latest
+  script:
+    - echo "===== Simulated deployment: Student Task Tracker ====="
+    - echo "1/4  Copy frontend build (student-task-tracker/dist) to the web server root."
+    - echo "2/4  Sync the PHP API (student-task-tracker/api) to the server."
+    - echo "3/4  Ensure api/.env on the server holds the production DB + SMTP secrets."
+    - echo "4/4  Reload the web server (Apache/Nginx)."
+    - echo "Deployment simulation complete for commit $CI_COMMIT_SHORT_SHA."
+  environment:
+    name: production
+  only:
+    - main
